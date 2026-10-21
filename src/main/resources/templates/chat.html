@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Controle de Frequência</title>
+    <link rel="stylesheet" th:href="@{/chat.css}">
+</head>
+<body>
+<main class="chat">
+    <header>
+        <h1>Controle de Frequência</h1>
+        <p>Digite "ajuda" para ver o que eu entendo.</p>
+    </header>
+
+    <div id="mensagens" class="mensagens" role="log" aria-live="polite" aria-label="Conversa"></div>
+
+    <form id="formulario" autocomplete="off">
+        <label for="texto" class="visualmente-oculto">Mensagem</label>
+        <input id="texto" name="texto" type="text" maxlength="500" required
+               placeholder="Ex.: Faltei hoje em Banco de Dados">
+        <button type="submit">Enviar</button>
+    </form>
+</main>
+<script th:src="@{/chat.js}"></script>
+</body>
+</html>
