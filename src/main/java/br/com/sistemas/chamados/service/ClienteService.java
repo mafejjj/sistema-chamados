@@ -11,14 +11,17 @@ import br.com.sistemas.chamados.entity.Cliente;
 import br.com.sistemas.chamados.exception.RecursoNaoEncontradoException;
 import br.com.sistemas.chamados.exception.RegraNegocioException;
 import br.com.sistemas.chamados.repository.ClienteRepository;
+import br.com.sistemas.chamados.repository.ChamadoRepository;
 
 @Service
 public class ClienteService {
 
     private final ClienteRepository repository;
+    private final ChamadoRepository chamadoRepository;
 
-    public ClienteService(ClienteRepository repository) {
+    public ClienteService(ClienteRepository repository, ChamadoRepository chamadoRepository) {
         this.repository = repository;
+        this.chamadoRepository = chamadoRepository;
     }
 
     @Transactional
@@ -54,7 +57,12 @@ public class ClienteService {
 
     @Transactional
     public void excluir(Long id) {
-        repository.delete(buscarEntity(id));
+        buscarEntity(id);
+        if (chamadoRepository.existsByClienteId(id)) {
+            throw new RegraNegocioException(
+                "Cliente " + id + " não pode ser excluído porque possui chamados");
+        }
+        repository.deleteById(id);
     }
 
     private Cliente buscarEntity(Long id) {
