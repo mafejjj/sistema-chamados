@@ -1,0 +1,159 @@
+:root {
+    --fundo: #f4f6f8;
+    --cartao: #ffffff;
+    --texto: #1f2937;
+    --suave: #6b7280;
+    --borda: #e3e6ea;
+    --primaria: #0f6b3a;
+    --primaria-escura: #0b552e;
+    --perigo: #b42318;
+    --raio: 8px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    background: var(--fundo);
+    color: var(--texto);
+}
+
+a { color: var(--primaria); }
+
+/* Cabeçalho e menu */
+header { background: var(--primaria); color: #fff; }
+header .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 10px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 24px;
+}
+header .marca { color: #fff; font-weight: 700; font-size: 18px; text-decoration: none; }
+nav { display: flex; flex-wrap: wrap; gap: 4px; }
+nav a { color: #d1fae5; text-decoration: none; padding: 6px 10px; border-radius: 6px; }
+nav a:hover, nav a.ativo { background: rgba(255, 255, 255, .16); color: #fff; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 24px; margin: 0 0 16px; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+
+.topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.topo h1 { margin: 0; }
+
+.card {
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.colunas { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+
+/* Formulários */
+.campos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.campos .inteiro { grid-column: 1 / -1; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--suave); }
+input, select, textarea {
+    font: inherit;
+    color: var(--texto);
+    background: #fff;
+    padding: 8px 10px;
+    border: 1px solid var(--borda);
+    border-radius: 6px;
+    width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primaria); outline-offset: -1px; }
+textarea { min-height: 90px; resize: vertical; }
+
+button, .botao {
+    font: inherit;
+    display: inline-block;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--primaria);
+    background: var(--primaria);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+button:hover, .botao:hover { background: var(--primaria-escura); }
+button:disabled { opacity: .5; cursor: default; }
+.secundario { background: #fff; color: var(--primaria); }
+.secundario:hover { background: #eef7f1; }
+.perigo { background: #fff; color: var(--perigo); border-color: var(--perigo); }
+.perigo:hover { background: #fef3f2; }
+.pequeno { padding: 4px 10px; font-size: 13px; }
+.acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.linha-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.linha-form label { flex: 1 1 180px; }
+
+details > summary { cursor: pointer; font-weight: 600; }
+details[open] > summary { margin-bottom: 12px; }
+
+/* Tabelas */
+.tabela { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borda); vertical-align: middle; }
+th { font-size: 13px; font-weight: 600; color: var(--suave); }
+td.col-acoes { text-align: right; white-space: nowrap; }
+.vazio { text-align: center; color: var(--suave); padding: 20px; }
+
+.paginacao { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; font-size: 13px; color: var(--suave); }
+
+/* Mensagens */
+.mensagem { padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; white-space: pre-line; }
+.mensagem.erro { background: #fef3f2; color: var(--perigo); border: 1px solid #fecdca; }
+.mensagem.ok { background: #ecfdf3; color: #067647; border: 1px solid #abefc6; }
+.nota { color: var(--suave); font-size: 13px; margin: 8px 0 0; }
+
+/* Etiquetas de status e prioridade */
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.status-ABERTO { background: #e0f2fe; color: #075985; }
+.status-EM_ATENDIMENTO { background: #fef3c7; color: #92400e; }
+.status-AGUARDANDO_CLIENTE { background: #ede9fe; color: #5b21b6; }
+.status-FECHADO { background: #e5e7eb; color: #374151; }
+.prio-BAIXA { background: #ecfdf3; color: #067647; }
+.prio-MEDIA { background: #e0f2fe; color: #075985; }
+.prio-ALTA { background: #fff4e5; color: #b54708; }
+.prio-CRITICA { background: #fee4e2; color: #b42318; }
+
+/* Dashboard */
+.cartoes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
+.stat {
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio);
+    padding: 14px 16px; text-decoration: none; color: var(--texto);
+}
+.stat:hover { border-color: var(--primaria); }
+.stat strong { font-size: 28px; line-height: 1; }
+.stat span { font-size: 13px; color: var(--suave); }
+.linha-barra { display: grid; grid-template-columns: 70px 1fr 32px; gap: 10px; align-items: center; margin-bottom: 8px; }
+.linha-barra strong { text-align: right; }
+.barra { height: 10px; background: var(--fundo); border-radius: 5px; overflow: hidden; }
+.barra span { display: block; height: 100%; background: var(--primaria); border-radius: 5px; }
+
+/* Detalhes */
+dl.detalhes { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dl.detalhes dt { color: var(--suave); }
+dl.detalhes dd { margin: 0; white-space: pre-line; }
+
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { padding: 10px 0; border-bottom: 1px solid var(--borda); }
+.lista li:last-child { border-bottom: 0; }
+.lista .meta { font-size: 13px; color: var(--suave); }
+.lista p { margin: 4px 0 0; white-space: pre-line; }
+
+@media (max-width: 600px) {
+    h1 { font-size: 20px; }
+    dl.detalhes { grid-template-columns: 1fr; gap: 0; }
+    dl.detalhes dd { margin-bottom: 8px; }
+}

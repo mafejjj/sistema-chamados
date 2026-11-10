@@ -1,6 +1,7 @@
 package br.com.sistemas.chamados.controller;
 
 import java.net.URI;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +21,7 @@ import br.com.sistemas.chamados.dto.AlterarStatusRequest;
 import br.com.sistemas.chamados.dto.AtribuirTecnicoRequest;
 import br.com.sistemas.chamados.dto.ChamadoRequest;
 import br.com.sistemas.chamados.dto.ChamadoResponse;
+import br.com.sistemas.chamados.dto.HistoricoStatusResponse;
 import br.com.sistemas.chamados.entity.Prioridade;
 import br.com.sistemas.chamados.entity.StatusChamado;
 import br.com.sistemas.chamados.service.ChamadoService;
@@ -81,5 +83,10 @@ public class ChamadoController {
         @PathVariable Long id,
         @Valid @RequestBody AlterarStatusRequest dto) {
         return service.alterarStatus(id, dto);
+    }
+
+    @GetMapping("/{id}/historico")
+    public List<HistoricoStatusResponse> historico(@PathVariable Long id) {
+        return service.historico(id);
     }
 }

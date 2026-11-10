@@ -24,6 +24,7 @@ import br.com.sistemas.chamados.repository.CategoriaRepository;
 import br.com.sistemas.chamados.repository.ChamadoRepository;
 import br.com.sistemas.chamados.repository.ClienteRepository;
 import br.com.sistemas.chamados.repository.ComentarioRepository;
+import br.com.sistemas.chamados.repository.HistoricoStatusRepository;
 import br.com.sistemas.chamados.repository.TecnicoRepository;
 
 @SpringBootTest
@@ -48,8 +49,12 @@ class ChamadosApiTests {
     @Autowired
     private ComentarioRepository comentarioRepository;
 
+    @Autowired
+    private HistoricoStatusRepository historicoRepository;
+
     @BeforeEach
     void limparBanco() {
+        historicoRepository.deleteAll();
         comentarioRepository.deleteAll();
         chamadoRepository.deleteAll();
         tecnicoRepository.deleteAll();
@@ -291,6 +296,103 @@ class ChamadosApiTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content", hasSize(1)))
             .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void deveRegistrarHistoricoDeStatus() throws Exception {
+        Cliente cliente = criarCliente("cliente-historico@exemplo.com");
+        Categoria categoria = criarCategoria("Historico");
+        Long chamadoId = criarChamado(cliente, categoria);
+
+        mockMvc.perform(patch("/chamados/{id}/status", chamadoId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"EM_ATENDIMENTO\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(patch("/chamados/{id}/status", chamadoId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"FECHADO\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/chamados/{id}/historico", chamadoId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(3)))
+            .andExpect(jsonPath("$[0].statusAnterior").doesNotExist())
+            .andExpect(jsonPath("$[0].statusNovo").value("ABERTO"))
+            .andExpect(jsonPath("$[1].statusAnterior").value("ABERTO"))
+            .andExpect(jsonPath("$[1].statusNovo").value("EM_ATENDIMENTO"))
+            .andExpect(jsonPath("$[2].statusNovo").value("FECHADO"));
+
+        mockMvc.perform(get("/chamados/{id}/historico", 99999))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveExcluirChamadoComComentariosEHistorico() throws Exception {
+        Cliente cliente = criarCliente("cliente-excluir@exemplo.com");
+        Categoria categoria = criarCategoria("Excluir");
+        Long chamadoId = criarChamado(cliente, categoria);
+
+        mockMvc.perform(post("/chamados/{id}/comentarios", chamadoId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"texto\":\"Comentário\",\"autor\":\"Ana\"}"))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(delete("/chamados/{id}", chamadoId))
+            .andExpect(status().isNoContent());
+        mockMvc.perform(get("/chamados/{id}", chamadoId))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveResumirChamadosNoDashboard() throws Exception {
+        Cliente cliente = criarCliente("cliente-dashboard@exemplo.com");
+        Categoria categoria = criarCategoria("Dashboard");
+        Long chamadoId = criarChamado(cliente, categoria);
+        criarChamado(cliente, categoria);
+
+        mockMvc.perform(patch("/chamados/{id}/status", chamadoId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"EM_ATENDIMENTO\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/dashboard"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalChamados").value(2))
+            .andExpect(jsonPath("$.porStatus.ABERTO").value(1))
+            .andExpect(jsonPath("$.porStatus.EM_ATENDIMENTO").value(1))
+            .andExpect(jsonPath("$.porStatus.FECHADO").value(0))
+            .andExpect(jsonPath("$.porPrioridade.ALTA").value(2))
+            .andExpect(jsonPath("$.porPrioridade.BAIXA").value(0));
+    }
+
+    @Test
+    void deveRetornar400ParaEnumInvalidoNoCorpoENoFiltro() throws Exception {
+        mockMvc.perform(post("/tecnicos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nome\":\"X\",\"email\":\"x@exemplo.com\",\"perfil\":\"GERENTE\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400));
+
+        mockMvc.perform(get("/chamados").param("status", "INEXISTENTE"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.erro").value("Parâmetro inválido"));
+    }
+
+    @Test
+    void deveExporDocumentacaoOpenApi() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.info.title").value("Sistema de Chamados API"))
+            .andExpect(jsonPath("$.paths['/chamados']").exists());
+    }
+
+    @Test
+    void deveServirAsTelasDoFrontEnd() throws Exception {
+        for (String tela : java.util.List.of("/index.html", "/chamados.html", "/chamado.html",
+                "/clientes.html", "/cliente.html", "/categorias.html", "/tecnicos.html",
+                "/js/app.js", "/js/crud.js", "/css/estilo.css")) {
+            mockMvc.perform(get(tela)).andExpect(status().isOk());
+        }
     }
 
     private Cliente criarCliente(String email) {

@@ -13,9 +13,11 @@ import br.com.sistemas.chamados.dto.AtribuirTecnicoRequest;
 import br.com.sistemas.chamados.dto.ChamadoRequest;
 import br.com.sistemas.chamados.dto.ChamadoResponse;
 import br.com.sistemas.chamados.dto.ComentarioResponse;
+import br.com.sistemas.chamados.dto.HistoricoStatusResponse;
 import br.com.sistemas.chamados.entity.Categoria;
 import br.com.sistemas.chamados.entity.Chamado;
 import br.com.sistemas.chamados.entity.Cliente;
+import br.com.sistemas.chamados.entity.HistoricoStatus;
 import br.com.sistemas.chamados.entity.StatusChamado;
 import br.com.sistemas.chamados.entity.Tecnico;
 import br.com.sistemas.chamados.exception.RecursoNaoEncontradoException;
@@ -24,6 +26,7 @@ import br.com.sistemas.chamados.repository.CategoriaRepository;
 import br.com.sistemas.chamados.repository.ChamadoRepository;
 import br.com.sistemas.chamados.repository.ClienteRepository;
 import br.com.sistemas.chamados.repository.ComentarioRepository;
+import br.com.sistemas.chamados.repository.HistoricoStatusRepository;
 import br.com.sistemas.chamados.repository.TecnicoRepository;
 
 @Service
@@ -34,24 +37,35 @@ public class ChamadoService {
     private final CategoriaRepository categoriaRepository;
     private final TecnicoRepository tecnicoRepository;
     private final ComentarioRepository comentarioRepository;
+    private final HistoricoStatusRepository historicoRepository;
 
     public ChamadoService(ChamadoRepository repository,
         ClienteRepository clienteRepository, CategoriaRepository categoriaRepository,
-        TecnicoRepository tecnicoRepository, ComentarioRepository comentarioRepository) {
+        TecnicoRepository tecnicoRepository, ComentarioRepository comentarioRepository,
+        HistoricoStatusRepository historicoRepository) {
         this.repository = repository;
         this.clienteRepository = clienteRepository;
         this.categoriaRepository = categoriaRepository;
         this.tecnicoRepository = tecnicoRepository;
         this.comentarioRepository = comentarioRepository;
+        this.historicoRepository = historicoRepository;
     }
 
     @Transactional
     public ChamadoResponse criar(ChamadoRequest dto) {
         Cliente cliente = buscarCliente(dto.clienteId());
         Categoria categoria = buscarCategoria(dto.categoriaId());
-        Chamado chamado = new Chamado(
-            dto.titulo(), dto.descricao(), dto.prioridade(), cliente, categoria);
-        return ChamadoResponse.de(repository.save(chamado));
+        Chamado chamado = repository.save(new Chamado(
+            dto.titulo(), dto.descricao(), dto.prioridade(), cliente, categoria));
+        historicoRepository.save(new HistoricoStatus(chamado, null, chamado.getStatus()));
+        return ChamadoResponse.de(chamado);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoricoStatusResponse> historico(Long id) {
+        buscarEntity(id);
+        return historicoRepository.findByChamadoIdOrderByDataAscIdAsc(id)
+            .stream().map(HistoricoStatusResponse::de).toList();
     }
 
     @Transactional(readOnly = true)
@@ -110,6 +124,8 @@ public class ChamadoService {
     public void excluir(Long id) {
         Chamado chamado = buscarEntity(id);
         impedirAlteracaoSeFechado(chamado);
+        comentarioRepository.deleteByChamadoId(id);
+        historicoRepository.deleteByChamadoId(id);
         repository.delete(chamado);
     }
 
@@ -128,8 +144,10 @@ public class ChamadoService {
     public ChamadoResponse alterarStatus(Long id, AlterarStatusRequest dto) {
         Chamado chamado = buscarEntity(id);
         impedirAlteracaoSeFechado(chamado);
-        validarTransicao(chamado.getStatus(), dto.status());
+        StatusChamado anterior = chamado.getStatus();
+        validarTransicao(anterior, dto.status());
         chamado.setStatus(dto.status());
+        historicoRepository.save(new HistoricoStatus(chamado, anterior, dto.status()));
         chamado.setDataFechamento(dto.status() == StatusChamado.FECHADO
             ? LocalDateTime.now() : null);
         return ChamadoResponse.de(chamado);

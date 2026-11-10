@@ -30,4 +30,8 @@ public interface ChamadoRepository extends JpaRepository<Chamado, Long> {
     Page<Chamado> findByPrioridade(Prioridade prioridade, Pageable pageable);
 
     Page<Chamado> findByClienteId(Long clienteId, Pageable pageable);
+
+    long countByStatus(StatusChamado status);
+
+    long countByPrioridade(Prioridade prioridade);
 }

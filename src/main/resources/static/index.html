@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard · Sistema de Chamados</title>
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<main>
+    <div class="topo">
+        <h1>Dashboard</h1>
+        <a class="botao" href="chamados.html?novo=1">Abrir chamado</a>
+    </div>
+    <div id="mensagem" hidden></div>
+
+    <div class="cartoes" id="cartoes"></div>
+
+    <div class="colunas">
+        <section class="card">
+            <h2>Chamados por prioridade</h2>
+            <div id="prioridades"></div>
+        </section>
+
+        <section class="card">
+            <h2>Atalhos</h2>
+            <div class="acoes" style="margin:0">
+                <a class="botao secundario" href="clientes.html">Cadastrar cliente</a>
+                <a class="botao secundario" href="categorias.html">Cadastrar categoria</a>
+                <a class="botao secundario" href="tecnicos.html">Cadastrar técnico</a>
+                <a class="botao secundario" href="/swagger-ui.html">Documentação da API</a>
+            </div>
+        </section>
+    </div>
+
+    <section class="card">
+        <div class="topo" style="margin-bottom:8px">
+            <h2 style="margin:0">Chamados recentes</h2>
+            <a href="chamados.html">Ver todos</a>
+        </div>
+        <div class="tabela">
+            <table>
+                <thead><tr><th>Título</th><th>Cliente</th><th>Prioridade</th><th>Status</th><th>Abertura</th></tr></thead>
+                <tbody id="recentes"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script src="js/app.js"></script>
+<script>
+    montarLayout('index.html');
+
+    async function carregarDashboard() {
+        try {
+            const [resumo, recentes, clientes] = await Promise.all([
+                api('GET', '/dashboard'),
+                api('GET', '/chamados?size=5&sort=dataAbertura,desc'),
+                api('GET', '/clientes')
+            ]);
+
+            document.getElementById('cartoes').innerHTML =
+                `<a class="stat" href="chamados.html"><span>Total de chamados</span><strong>${resumo.totalChamados}</strong></a>` +
+                Object.entries(resumo.porStatus).map(([status, total]) =>
+                    `<a class="stat" href="chamados.html?status=${status}">
+                        <span>${badgeStatus(status)}</span><strong>${total}</strong>
+                    </a>`).join('');
+
+            const maior = Math.max(1, ...Object.values(resumo.porPrioridade));
+            document.getElementById('prioridades').innerHTML =
+                Object.entries(resumo.porPrioridade).map(([prioridade, total]) => `
+                    <div class="linha-barra">
+                        <a href="chamados.html?prioridade=${prioridade}">${PRIORIDADES[prioridade]}</a>
+                        <div class="barra"><span style="width:${(total / maior) * 100}%"></span></div>
+                        <strong>${total}</strong>
+                    </div>`).join('');
+
+            const clientesPorId = indexarPorId(clientes);
+            const lista = recentes.content;
+            document.getElementById('recentes').innerHTML = lista.length
+                ? lista.map(c => `<tr>
+                    <td>${linkChamado(c)}</td>
+                    <td>${nomeDe(clientesPorId, c.clienteId)}</td>
+                    <td>${badgePrioridade(c.prioridade)}</td>
+                    <td>${badgeStatus(c.status)}</td>
+                    <td>${formatarData(c.dataAbertura)}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="5" class="vazio">Nenhum chamado aberto ainda.</td></tr>';
+        } catch (e) {
+            erro(e);
+        }
+    }
+
+    carregarDashboard();
+</script>
+</body>
+</html>
