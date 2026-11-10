@@ -104,4 +104,9 @@ Exemplo:
 cmd /c mvnw.cmd test
 ```
 
+A suíte cobre o checkpoint do fluxo Cliente, CRUD de Categorias e Técnicos,
+criação e regras de Chamados, filtros com paginação, comentários, validações,
+duplicidade e recursos inexistentes. A entrega deve ser validada pelo professor
+antes do commit e do Pull Request.
+
 O console do H2 fica disponível em `http://localhost:8080/h2-console`, usando JDBC URL `jdbc:h2:mem:chamadosdb`, usuário `sa` e senha em branco.

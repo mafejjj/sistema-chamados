@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -67,6 +69,42 @@ class ClienteControllerTests {
         mockMvc.perform(get("/clientes/999"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void deveConsultarAtualizarEExcluirCliente() throws Exception {
+        when(service.buscar(1L))
+            .thenReturn(new ClienteResponse(1L, "Ana", "ana@exemplo.com", "47999999999"));
+        when(service.atualizar(any(Long.class), any(ClienteRequest.class)))
+            .thenReturn(new ClienteResponse(1L, "Ana Atualizada",
+                "ana.atualizada@exemplo.com", "47888888888"));
+
+        mockMvc.perform(get("/clientes/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.email").value("ana@exemplo.com"));
+
+        mockMvc.perform(put("/clientes/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Ana Atualizada","email":"ana.atualizada@exemplo.com",
+                    "telefone":"47888888888"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nome").value("Ana Atualizada"));
+
+        mockMvc.perform(delete("/clientes/1"))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deveListarClientes() throws Exception {
+        when(service.listar()).thenReturn(java.util.List.of(
+            new ClienteResponse(1L, "Ana", "ana@exemplo.com", "47999999999")));
+
+        mockMvc.perform(get("/clientes"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
+            .andExpect(jsonPath("$[0].id").value(1));
     }
 
     @TestConfiguration

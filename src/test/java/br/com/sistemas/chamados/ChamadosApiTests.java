@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -169,6 +170,127 @@ class ChamadosApiTests {
                     {"nome":"Técnico 2","email":"duplicado@exemplo.com","perfil":"ADMIN"}
                     """))
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void deveCompletarCrudDeClienteEImpedirEmailDuplicado() throws Exception {
+        String email = "cliente-crud@exemplo.com";
+        String resposta = mockMvc.perform(post("/clientes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Cliente CRUD","email":"cliente-crud@exemplo.com",
+                    "telefone":"47999999999"}
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        Number idNumero = com.jayway.jsonpath.JsonPath.read(resposta, "$.id");
+        Long id = idNumero.longValue();
+
+        mockMvc.perform(get("/clientes"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].email").value(email));
+        mockMvc.perform(get("/clientes/{id}", id))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nome").value("Cliente CRUD"));
+        mockMvc.perform(put("/clientes/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Cliente Atualizado","email":"cliente-crud@exemplo.com",
+                    "telefone":"47888888888"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nome").value("Cliente Atualizado"));
+        mockMvc.perform(post("/clientes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Outro","email":"cliente-crud@exemplo.com","telefone":"47777777777"}
+                    """))
+            .andExpect(status().isConflict());
+        mockMvc.perform(delete("/clientes/{id}", id))
+            .andExpect(status().isNoContent());
+        mockMvc.perform(get("/clientes/{id}", id))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveCompletarCrudDeCategoria() throws Exception {
+        String resposta = mockMvc.perform(post("/categorias")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Categoria CRUD","descricao":"Descrição"}
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        Number idNumero = com.jayway.jsonpath.JsonPath.read(resposta, "$.id");
+        Long id = idNumero.longValue();
+
+        mockMvc.perform(get("/categorias"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].nome").value("Categoria CRUD"));
+        mockMvc.perform(get("/categorias/{id}", id))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/categorias/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Categoria Atualizada","descricao":"Nova descrição"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nome").value("Categoria Atualizada"));
+        mockMvc.perform(post("/categorias")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Categoria Atualizada","descricao":"Duplicada"}
+                    """))
+            .andExpect(status().isConflict());
+        mockMvc.perform(delete("/categorias/{id}", id))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deveCompletarCrudDeTecnico() throws Exception {
+        String resposta = mockMvc.perform(post("/tecnicos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Técnico CRUD","email":"tecnico-crud@exemplo.com","perfil":"ADMIN"}
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        Number idNumero = com.jayway.jsonpath.JsonPath.read(resposta, "$.id");
+        Long id = idNumero.longValue();
+
+        mockMvc.perform(get("/tecnicos"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].perfil").value("ADMIN"));
+        mockMvc.perform(get("/tecnicos/{id}", id))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/tecnicos/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"nome":"Técnico Atualizado","email":"tecnico-crud@exemplo.com",
+                    "perfil":"TECNICO"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.perfil").value("TECNICO"));
+        mockMvc.perform(delete("/tecnicos/{id}", id))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deveValidarTransicaoInvalidaEPaginacaoEChamadosDoCliente() throws Exception {
+        Cliente cliente = criarCliente("cliente-paginacao@exemplo.com");
+        Categoria categoria = criarCategoria("Paginacao");
+        Long chamadoId = criarChamado(cliente, categoria);
+
+        mockMvc.perform(patch("/chamados/{id}/status", chamadoId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"FECHADO\"}"))
+            .andExpect(status().isConflict());
+        mockMvc.perform(get("/clientes/{id}/chamados", cliente.getId())
+                .param("page", "0").param("size", "1")
+                .param("sort", "dataAbertura,desc"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     private Cliente criarCliente(String email) {
