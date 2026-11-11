@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cliente · Sistema de Chamados</title>
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<main>
+    <p><a href="clientes.html">← Voltar para clientes</a></p>
+    <div id="mensagem" hidden></div>
+
+    <div id="conteudo">
+        <div class="topo">
+            <h1 id="nome">Cliente</h1>
+            <div class="acoes" style="margin:0">
+                <a id="editar" class="botao secundario" href="#">Editar</a>
+                <a id="novo-chamado" class="botao" href="#">Abrir chamado</a>
+            </div>
+        </div>
+
+        <section class="card">
+            <h2>Dados</h2>
+            <dl class="detalhes" id="dados"></dl>
+        </section>
+
+        <section class="card">
+            <h2>Chamados do cliente</h2>
+            <div class="tabela">
+                <table>
+                    <thead><tr><th>#</th><th>Título</th><th>Prioridade</th><th>Status</th><th>Abertura</th><th>Fechamento</th></tr></thead>
+                    <tbody id="linhas"></tbody>
+                </table>
+            </div>
+            <div class="paginacao" id="paginacao"></div>
+        </section>
+    </div>
+</main>
+
+<script src="js/app.js"></script>
+<script>
+    montarLayout('clientes.html');
+    const clienteId = parametro('id');
+    let pagina = 0;
+
+    async function carregarCliente() {
+        try {
+            const cliente = await api('GET', `/clientes/${clienteId}`);
+            document.title = `${cliente.nome} · Sistema de Chamados`;
+            document.getElementById('nome').textContent = cliente.nome;
+            document.getElementById('dados').innerHTML = `
+                <dt>E-mail</dt><dd>${esc(cliente.email)}</dd>
+                <dt>Telefone</dt><dd>${esc(cliente.telefone ?? '—')}</dd>`;
+            document.getElementById('editar').href = `clientes.html?editar=${cliente.id}`;
+            document.getElementById('novo-chamado').href = `chamados.html?novo=1&clienteId=${cliente.id}`;
+            await carregarChamados();
+        } catch (e) {
+            erro(e);
+            document.getElementById('conteudo').hidden = true;
+        }
+    }
+
+    async function carregarChamados() {
+        const params = new URLSearchParams({ page: pagina, size: 10, sort: 'dataAbertura,desc' });
+        try {
+            const resultado = await api('GET', `/clientes/${clienteId}/chamados?${params}`);
+            const lista = resultado.content;
+            document.getElementById('linhas').innerHTML = lista.length
+                ? lista.map(c => `<tr>
+                    <td>#${c.id}</td><td>${linkChamado(c)}</td>
+                    <td>${badgePrioridade(c.prioridade)}</td><td>${badgeStatus(c.status)}</td>
+                    <td>${formatarData(c.dataAbertura)}</td><td>${formatarData(c.dataFechamento)}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="6" class="vazio">Este cliente ainda não abriu chamados.</td></tr>';
+            renderizarPaginacao(document.getElementById('paginacao'), resultado, p => {
+                pagina = p;
+                carregarChamados();
+            });
+        } catch (e) {
+            erro(e);
+        }
+    }
+
+    if (clienteId) {
+        carregarCliente();
+    } else {
+        mensagem('Cliente não informado.', 'erro');
+        document.getElementById('conteudo').hidden = true;
+    }
+</script>
+</body>
+</html>

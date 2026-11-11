@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chamados · Sistema de Chamados</title>
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<main>
+    <h1>Chamados</h1>
+    <div id="mensagem" hidden></div>
+
+    <section class="card">
+        <details id="novo">
+            <summary>Abrir novo chamado</summary>
+            <p class="nota" id="aviso-novo" hidden>
+                Cadastre ao menos um <a href="clientes.html">cliente</a> e uma
+                <a href="categorias.html">categoria</a> antes de abrir chamados.
+            </p>
+            <form id="form-novo">
+                <div class="campos">
+                    <label class="inteiro">Título <input name="titulo" maxlength="150" required></label>
+                    <label>Prioridade <select name="prioridade" required></select></label>
+                    <label>Cliente <select name="clienteId" required></select></label>
+                    <label>Categoria <select name="categoriaId" required></select></label>
+                    <label class="inteiro">Descrição <textarea name="descricao" maxlength="2000" required></textarea></label>
+                </div>
+                <div class="acoes">
+                    <button type="submit">Abrir chamado</button>
+                </div>
+            </form>
+        </details>
+    </section>
+
+    <section class="card">
+        <form id="filtros" class="campos">
+            <label>Status <select name="status"></select></label>
+            <label>Prioridade <select name="prioridade"></select></label>
+            <label>Cliente <select name="clienteId"></select></label>
+            <label>Ordenar por
+                <select name="ordem">
+                    <option value="dataAbertura,desc">Mais recentes primeiro</option>
+                    <option value="dataAbertura,asc">Mais antigos primeiro</option>
+                    <option value="titulo,asc">Título (A–Z)</option>
+                </select>
+            </label>
+        </form>
+        <div class="acoes">
+            <button type="button" id="limpar-filtros" class="secundario pequeno">Limpar filtros</button>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="tabela">
+            <table>
+                <thead>
+                <tr><th>#</th><th>Título</th><th>Cliente</th><th>Categoria</th><th>Técnico</th><th>Prioridade</th><th>Status</th><th>Abertura</th></tr>
+                </thead>
+                <tbody id="linhas"></tbody>
+            </table>
+        </div>
+        <div class="paginacao" id="paginacao"></div>
+    </section>
+</main>
+
+<script src="js/app.js"></script>
+<script>
+    montarLayout('chamados.html');
+
+    const filtros = document.getElementById('filtros');
+    const formNovo = document.getElementById('form-novo');
+    let pagina = 0;
+    let mapas = { clientes: {}, categorias: {}, tecnicos: {} };
+
+    async function iniciar() {
+        try {
+            const [clientes, categorias, tecnicos] = await Promise.all([
+                api('GET', '/clientes'), api('GET', '/categorias'), api('GET', '/tecnicos')
+            ]);
+            mapas = {
+                clientes: indexarPorId(clientes),
+                categorias: indexarPorId(categorias),
+                tecnicos: indexarPorId(tecnicos)
+            };
+
+            // Filtros iniciais podem vir da URL (ex.: links do dashboard).
+            filtros.elements.status.innerHTML = opcoesMapa(STATUS, parametro('status') ?? '', 'Todos');
+            filtros.elements.prioridade.innerHTML = opcoesMapa(PRIORIDADES, parametro('prioridade') ?? '', 'Todas');
+            filtros.elements.clienteId.innerHTML = opcoesLista(clientes, parametro('clienteId') ?? '', 'Todos');
+
+            formNovo.elements.prioridade.innerHTML = opcoesMapa(PRIORIDADES, 'MEDIA');
+            formNovo.elements.clienteId.innerHTML = opcoesLista(clientes, parametro('clienteId') ?? '', 'Selecione...');
+            formNovo.elements.categoriaId.innerHTML = opcoesLista(categorias, '', 'Selecione...');
+            document.getElementById('aviso-novo').hidden = clientes.length > 0 && categorias.length > 0;
+            if (parametro('novo')) {
+                document.getElementById('novo').open = true;
+                formNovo.elements.titulo.focus();
+            }
+        } catch (e) {
+            erro(e);
+        }
+        carregar();
+    }
+
+    async function carregar() {
+        const params = new URLSearchParams({ page: pagina, size: 10, sort: filtros.elements.ordem.value });
+        for (const campo of ['status', 'prioridade', 'clienteId']) {
+            const valor = filtros.elements[campo].value;
+            if (valor) params.set(campo, valor);
+        }
+        try {
+            const resultado = await api('GET', `/chamados?${params}`);
+            const lista = resultado.content;
+            document.getElementById('linhas').innerHTML = lista.length
+                ? lista.map(c => `<tr>
+                    <td>#${c.id}</td>
+                    <td>${linkChamado(c)}</td>
+                    <td>${nomeDe(mapas.clientes, c.clienteId)}</td>
+                    <td>${nomeDe(mapas.categorias, c.categoriaId)}</td>
+                    <td>${nomeDe(mapas.tecnicos, c.tecnicoId)}</td>
+                    <td>${badgePrioridade(c.prioridade)}</td>
+                    <td>${badgeStatus(c.status)}</td>
+                    <td>${formatarData(c.dataAbertura)}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="8" class="vazio">Nenhum chamado encontrado.</td></tr>';
+            renderizarPaginacao(document.getElementById('paginacao'), resultado, p => {
+                pagina = p;
+                carregar();
+            });
+        } catch (e) {
+            erro(e);
+        }
+    }
+
+    filtros.addEventListener('change', () => {
+        pagina = 0;
+        carregar();
+    });
+
+    document.getElementById('limpar-filtros').addEventListener('click', () => {
+        for (const campo of ['status', 'prioridade', 'clienteId']) filtros.elements[campo].value = '';
+        filtros.elements.ordem.value = 'dataAbertura,desc';
+        pagina = 0;
+        carregar();
+    });
+
+    formNovo.addEventListener('submit', async evento => {
+        evento.preventDefault();
+        const dados = dadosFormulario(formNovo);
+        dados.clienteId = paraNumero(dados.clienteId);
+        dados.categoriaId = paraNumero(dados.categoriaId);
+        try {
+            const criado = await api('POST', '/chamados', dados);
+            location.href = `chamado.html?id=${criado.id}&criado=1`;
+        } catch (e) {
+            erro(e);
+        }
+    });
+
+    iniciar();
+</script>
+</body>
+</html>

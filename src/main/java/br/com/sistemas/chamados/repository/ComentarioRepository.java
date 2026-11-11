@@ -8,4 +8,5 @@ import br.com.sistemas.chamados.entity.Comentario;
 
 public interface ComentarioRepository extends JpaRepository<Comentario, Long> {
     List<Comentario> findByChamadoIdOrderByDataAsc(Long chamadoId);
+    void deleteByChamadoId(Long chamadoId);
 }

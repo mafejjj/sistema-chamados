@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chamado · Sistema de Chamados</title>
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<main>
+    <p><a href="chamados.html">← Voltar para chamados</a></p>
+    <div id="mensagem" hidden></div>
+
+    <div id="conteudo">
+        <div class="topo">
+            <h1 id="titulo">Chamado</h1>
+            <div id="etiquetas"></div>
+        </div>
+
+        <div class="colunas">
+            <section class="card">
+                <h2>Dados do chamado</h2>
+                <dl class="detalhes" id="dados"></dl>
+            </section>
+
+            <section class="card">
+                <h2>Ações</h2>
+                <p class="nota" id="aviso-fechado" hidden>Chamado fechado: não pode mais ser alterado.</p>
+
+                <div id="acoes">
+                    <form id="form-status" class="linha-form">
+                        <label>Alterar status para <select name="status"></select></label>
+                        <button type="submit">Alterar status</button>
+                    </form>
+
+                    <form id="form-tecnico" class="linha-form" style="margin-top:12px">
+                        <label>Técnico responsável <select name="tecnicoId" required></select></label>
+                        <button type="submit">Atribuir</button>
+                    </form>
+
+                    <details style="margin-top:16px">
+                        <summary>Editar dados do chamado</summary>
+                        <form id="form-editar">
+                            <div class="campos">
+                                <label class="inteiro">Título <input name="titulo" maxlength="150" required></label>
+                                <label>Prioridade <select name="prioridade" required></select></label>
+                                <label>Cliente <select name="clienteId" required></select></label>
+                                <label>Categoria <select name="categoriaId" required></select></label>
+                                <label class="inteiro">Descrição <textarea name="descricao" maxlength="2000" required></textarea></label>
+                            </div>
+                            <div class="acoes">
+                                <button type="submit">Salvar alterações</button>
+                            </div>
+                        </form>
+                    </details>
+
+                    <div class="acoes" style="margin-top:16px">
+                        <button type="button" id="excluir" class="perigo">Excluir chamado</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="colunas">
+            <section class="card">
+                <h2>Comentários</h2>
+                <ul class="lista" id="comentarios"></ul>
+                <form id="form-comentario" style="margin-top:12px">
+                    <div class="campos">
+                        <label>Autor <input name="autor" maxlength="100" required></label>
+                        <label class="inteiro">Comentário <textarea name="texto" maxlength="2000" required></textarea></label>
+                    </div>
+                    <div class="acoes">
+                        <button type="submit">Registrar comentário</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2>Histórico de status</h2>
+                <ul class="lista" id="historico"></ul>
+            </section>
+        </div>
+    </div>
+</main>
+
+<script src="js/app.js"></script>
+<script>
+    montarLayout('chamados.html');
+
+    const chamadoId = parametro('id');
+    const formStatus = document.getElementById('form-status');
+    const formTecnico = document.getElementById('form-tecnico');
+    const formEditar = document.getElementById('form-editar');
+    const formComentario = document.getElementById('form-comentario');
+
+    async function carregar() {
+        try {
+            const [chamado, historico, clientes, categorias, tecnicos] = await Promise.all([
+                api('GET', `/chamados/${chamadoId}`),
+                api('GET', `/chamados/${chamadoId}/historico`),
+                api('GET', '/clientes'),
+                api('GET', '/categorias'),
+                api('GET', '/tecnicos')
+            ]);
+            renderizar(chamado, historico, clientes, categorias, tecnicos);
+        } catch (e) {
+            erro(e);
+            document.getElementById('conteudo').hidden = true;
+        }
+    }
+
+    function renderizar(chamado, historico, clientes, categorias, tecnicos) {
+        const clientesPorId = indexarPorId(clientes);
+        const categoriasPorId = indexarPorId(categorias);
+        const tecnicosPorId = indexarPorId(tecnicos);
+
+        document.title = `#${chamado.id} ${chamado.titulo} · Sistema de Chamados`;
+        document.getElementById('titulo').textContent = `#${chamado.id} · ${chamado.titulo}`;
+        document.getElementById('etiquetas').innerHTML =
+            `${badgePrioridade(chamado.prioridade)} ${badgeStatus(chamado.status)}`;
+
+        document.getElementById('dados').innerHTML = `
+            <dt>Cliente</dt><dd><a href="cliente.html?id=${chamado.clienteId}">${nomeDe(clientesPorId, chamado.clienteId)}</a></dd>
+            <dt>Categoria</dt><dd>${nomeDe(categoriasPorId, chamado.categoriaId)}</dd>
+            <dt>Técnico</dt><dd>${chamado.tecnicoId ? nomeDe(tecnicosPorId, chamado.tecnicoId) : 'Não atribuído'}</dd>
+            <dt>Abertura</dt><dd>${formatarData(chamado.dataAbertura)}</dd>
+            <dt>Fechamento</dt><dd>${formatarData(chamado.dataFechamento)}</dd>
+            <dt>Descrição</dt><dd>${esc(chamado.descricao)}</dd>`;
+
+        const fechado = chamado.status === 'FECHADO';
+        document.getElementById('acoes').hidden = fechado;
+        document.getElementById('aviso-fechado').hidden = !fechado;
+
+        if (!fechado) {
+            const proximos = Object.fromEntries(TRANSICOES[chamado.status].map(s => [s, STATUS[s]]));
+            formStatus.elements.status.innerHTML = opcoesMapa(proximos);
+            formTecnico.elements.tecnicoId.innerHTML = opcoesLista(tecnicos, chamado.tecnicoId ?? '', 'Selecione...');
+
+            formEditar.elements.titulo.value = chamado.titulo;
+            formEditar.elements.descricao.value = chamado.descricao;
+            formEditar.elements.prioridade.innerHTML = opcoesMapa(PRIORIDADES, chamado.prioridade);
+            formEditar.elements.clienteId.innerHTML = opcoesLista(clientes, chamado.clienteId);
+            formEditar.elements.categoriaId.innerHTML = opcoesLista(categorias, chamado.categoriaId);
+        }
+
+        document.getElementById('comentarios').innerHTML = chamado.comentarios.length
+            ? chamado.comentarios.map(c => `<li>
+                <div class="meta"><strong>${esc(c.autor)}</strong> · ${formatarData(c.data)}</div>
+                <p>${esc(c.texto)}</p>
+            </li>`).join('')
+            : '<li class="vazio">Nenhum comentário ainda.</li>';
+
+        document.getElementById('historico').innerHTML = historico.length
+            ? historico.map(h => `<li>
+                <div>${h.statusAnterior ? `${badgeStatus(h.statusAnterior)} → ` : 'Abertura: '}${badgeStatus(h.statusNovo)}</div>
+                <div class="meta">${formatarData(h.data)}</div>
+            </li>`).join('')
+            : '<li class="vazio">Sem registros.</li>';
+    }
+
+    async function executar(acao, textoSucesso) {
+        try {
+            await acao();
+            await carregar();
+            mensagem(textoSucesso);
+        } catch (e) {
+            erro(e);
+        }
+    }
+
+    formStatus.addEventListener('submit', evento => {
+        evento.preventDefault();
+        executar(() => api('PATCH', `/chamados/${chamadoId}/status`,
+            { status: formStatus.elements.status.value }), 'Status alterado.');
+    });
+
+    formTecnico.addEventListener('submit', evento => {
+        evento.preventDefault();
+        executar(() => api('PATCH', `/chamados/${chamadoId}/atribuir`,
+            { tecnicoId: paraNumero(formTecnico.elements.tecnicoId.value) }), 'Técnico atribuído.');
+    });
+
+    formEditar.addEventListener('submit', evento => {
+        evento.preventDefault();
+        const dados = dadosFormulario(formEditar);
+        dados.clienteId = paraNumero(dados.clienteId);
+        dados.categoriaId = paraNumero(dados.categoriaId);
+        executar(() => api('PUT', `/chamados/${chamadoId}`, dados), 'Chamado atualizado.');
+    });
+
+    formComentario.addEventListener('submit', evento => {
+        evento.preventDefault();
+        const dados = dadosFormulario(formComentario);
+        executar(async () => {
+            await api('POST', `/chamados/${chamadoId}/comentarios`, dados);
+            formComentario.elements.texto.value = '';
+        }, 'Comentário registrado.');
+    });
+
+    document.getElementById('excluir').addEventListener('click', async () => {
+        if (!confirm('Excluir este chamado? Os comentários e o histórico também serão removidos.')) return;
+        try {
+            await api('DELETE', `/chamados/${chamadoId}`);
+            location.href = 'chamados.html';
+        } catch (e) {
+            erro(e);
+        }
+    });
+
+    if (chamadoId) {
+        carregar().then(() => {
+            if (parametro('criado')) mensagem('Chamado aberto com sucesso.');
+        });
+    } else {
+        mensagem('Chamado não informado.', 'erro');
+        document.getElementById('conteudo').hidden = true;
+    }
+</script>
+</body>
+</html>
