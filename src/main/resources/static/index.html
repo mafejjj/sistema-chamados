@@ -9,83 +9,191 @@
 <body>
 <main>
     <div class="topo">
-        <h1>Dashboard</h1>
-        <a class="botao" href="chamados.html?novo=1">Abrir chamado</a>
+        <div>
+            <h1>Dashboard</h1>
+            <p class="dash-sub" id="hoje">Visão geral do atendimento</p>
+        </div>
+        <a class="botao" href="chamados.html?novo=1">+ Abrir chamado</a>
     </div>
     <div id="mensagem" hidden></div>
 
-    <div class="cartoes" id="cartoes"></div>
+    <div class="dash-kpis">
+        <a class="dash-kpi destaque" href="chamados.html">
+            <span class="rotulo">Total de chamados</span>
+            <strong id="kpi-total">–</strong>
+            <span class="rodape">desde o início</span>
+        </a>
+        <div class="dash-kpi">
+            <span class="rotulo">Em andamento</span>
+            <strong id="kpi-andamento">–</strong>
+            <span class="rodape">abertos, em atendimento ou aguardando</span>
+        </div>
+        <div class="dash-kpi">
+            <span class="rotulo">Taxa de resolução</span>
+            <strong id="kpi-resolucao">–</strong>
+            <span class="rodape" id="kpi-fechados">chamados fechados</span>
+        </div>
+    </div>
 
-    <div class="colunas">
-        <section class="card">
-            <h2>Chamados por prioridade</h2>
-            <div id="prioridades"></div>
+    <div class="dash-grade">
+        <section class="card dash-status">
+            <h2>Chamados por status</h2>
+            <div class="dash-pilha" id="pilha" role="img" aria-label="Distribuição dos chamados por status"></div>
+            <div class="dash-legenda" id="legenda-status"></div>
         </section>
 
         <section class="card">
-            <h2>Atalhos</h2>
-            <div class="acoes" style="margin:0">
-                <a class="botao secundario" href="clientes.html">Cadastrar cliente</a>
-                <a class="botao secundario" href="categorias.html">Cadastrar categoria</a>
-                <a class="botao secundario" href="tecnicos.html">Cadastrar técnico</a>
-                <a class="botao secundario" href="/swagger-ui.html">Documentação da API</a>
+            <h2>Por prioridade</h2>
+            <div id="prioridades"></div>
+        </section>
+    </div>
+
+    <div class="dash-grade">
+        <section class="card">
+            <div class="dash-cab">
+                <h2>Precisam de atenção</h2>
+                <span class="dash-sub">Crítica e alta, ainda não fechados</span>
+            </div>
+            <ul class="dash-atencao" id="atencao"></ul>
+        </section>
+
+        <section class="card">
+            <h2>Cadastros</h2>
+            <div class="dash-atalhos">
+                <a href="clientes.html"><span>Clientes</span><small>Quem abre os chamados</small></a>
+                <a href="categorias.html"><span>Categorias</span><small>Tipos de problema</small></a>
+                <a href="tecnicos.html"><span>Técnicos</span><small>Quem atende</small></a>
             </div>
         </section>
     </div>
 
     <section class="card">
-        <div class="topo" style="margin-bottom:8px">
-            <h2 style="margin:0">Chamados recentes</h2>
-            <a href="chamados.html">Ver todos</a>
+        <div class="dash-cab">
+            <h2>Chamados recentes</h2>
+            <a href="chamados.html">Ver todos →</a>
         </div>
         <div class="tabela">
             <table>
-                <thead><tr><th>Título</th><th>Cliente</th><th>Prioridade</th><th>Status</th><th>Abertura</th></tr></thead>
+                <thead><tr><th>Título</th><th>Cliente</th><th>Técnico</th><th>Prioridade</th><th>Status</th><th>Abertura</th></tr></thead>
                 <tbody id="recentes"></tbody>
             </table>
         </div>
     </section>
 </main>
 
+<div class="dash-dica" id="dica" hidden></div>
+
 <script src="js/app.js"></script>
 <script>
     montarLayout('index.html');
 
+    // Cores validadas (distintas também para daltônicos). Prioridade é ordinal: um só tom, do claro ao escuro.
+    const COR_STATUS = { ABERTO: '#0284c7', EM_ATENDIMENTO: '#d97706', AGUARDANDO_CLIENTE: '#7c3aed', FECHADO: '#16a34a' };
+    const COR_PRIORIDADE = { BAIXA: '#fdba74', MEDIA: '#fb923c', ALTA: '#ea580c', CRITICA: '#9a3412' };
+
+    document.getElementById('hoje').textContent = 'Visão geral do atendimento · ' +
+        new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    function tempoDesde(iso) {
+        const minutos = Math.max(0, Math.round((Date.now() - new Date(iso.slice(0, 19))) / 60000));
+        if (minutos < 1) return 'agora';
+        if (minutos < 60) return `há ${minutos} min`;
+        const horas = Math.round(minutos / 60);
+        if (horas < 24) return `há ${horas} h`;
+        const dias = Math.round(horas / 24);
+        return `há ${dias} dia${dias > 1 ? 's' : ''}`;
+    }
+
+    const pct = (n, total) => total ? Math.round((n / total) * 100) : 0;
+
+    // Dica ao passar o mouse nos gráficos
+    const dica = document.getElementById('dica');
+    document.addEventListener('mousemove', e => {
+        const alvo = e.target.closest('[data-dica]');
+        if (!alvo) { dica.hidden = true; return; }
+        dica.textContent = alvo.dataset.dica;
+        dica.hidden = false;
+        dica.style.left = `${e.clientX + 14}px`;
+        dica.style.top = `${e.clientY + 14}px`;
+    });
+
+    function renderizarStatus(porStatus, total) {
+        const entradas = Object.entries(porStatus);
+        document.getElementById('pilha').innerHTML = total
+            ? entradas.filter(([, n]) => n > 0).map(([status, n]) =>
+                `<a href="chamados.html?status=${status}" style="flex:${n};background:${COR_STATUS[status]}"
+                    data-dica="${STATUS[status]}: ${n} (${pct(n, total)}%)"></a>`).join('')
+            : '<span class="dash-vazio-barra"></span>';
+
+        document.getElementById('legenda-status').innerHTML = entradas.map(([status, n]) => `
+            <a href="chamados.html?status=${status}" class="item">
+                <span class="marca" style="background:${COR_STATUS[status]}"></span>
+                <span class="nome">${STATUS[status]}</span>
+                <strong>${n}</strong>
+                <span class="pct">${pct(n, total)}%</span>
+            </a>`).join('');
+    }
+
+    function renderizarPrioridades(porPrioridade) {
+        const maior = Math.max(1, ...Object.values(porPrioridade));
+        document.getElementById('prioridades').innerHTML = Object.entries(porPrioridade).map(([prioridade, n]) => `
+            <a class="dash-barra" href="chamados.html?prioridade=${prioridade}" data-dica="${PRIORIDADES[prioridade]}: ${n} chamado(s)">
+                <span class="nome">${PRIORIDADES[prioridade]}</span>
+                <span class="trilho"><span style="width:${(n / maior) * 100}%;background:${COR_PRIORIDADE[prioridade]}"></span></span>
+                <strong>${n}</strong>
+            </a>`).join('');
+    }
+
+    function renderizarAtencao(lista, clientes) {
+        const el = document.getElementById('atencao');
+        el.innerHTML = lista.length
+            ? lista.slice(0, 5).map(c => `<li>
+                <div class="info">
+                    ${linkChamado(c)}
+                    <span class="dash-sub">${nomeDe(clientes, c.clienteId)} · aberto ${tempoDesde(c.dataAbertura)}</span>
+                </div>
+                <div class="etiquetas">${badgePrioridade(c.prioridade)} ${badgeStatus(c.status)}</div>
+            </li>`).join('')
+            : '<li class="dash-ok">Nada urgente no momento.</li>';
+    }
+
     async function carregarDashboard() {
         try {
-            const [resumo, recentes, clientes] = await Promise.all([
+            const [resumo, recentes, criticos, altos, clientes, tecnicos] = await Promise.all([
                 api('GET', '/dashboard'),
                 api('GET', '/chamados?size=5&sort=dataAbertura,desc'),
-                api('GET', '/clientes')
+                api('GET', '/chamados?prioridade=CRITICA&size=50&sort=dataAbertura,asc'),
+                api('GET', '/chamados?prioridade=ALTA&size=50&sort=dataAbertura,asc'),
+                api('GET', '/clientes'),
+                api('GET', '/tecnicos')
             ]);
-
-            document.getElementById('cartoes').innerHTML =
-                `<a class="stat" href="chamados.html"><span>Total de chamados</span><strong>${resumo.totalChamados}</strong></a>` +
-                Object.entries(resumo.porStatus).map(([status, total]) =>
-                    `<a class="stat" href="chamados.html?status=${status}">
-                        <span>${badgeStatus(status)}</span><strong>${total}</strong>
-                    </a>`).join('');
-
-            const maior = Math.max(1, ...Object.values(resumo.porPrioridade));
-            document.getElementById('prioridades').innerHTML =
-                Object.entries(resumo.porPrioridade).map(([prioridade, total]) => `
-                    <div class="linha-barra">
-                        <a href="chamados.html?prioridade=${prioridade}">${PRIORIDADES[prioridade]}</a>
-                        <div class="barra"><span style="width:${(total / maior) * 100}%"></span></div>
-                        <strong>${total}</strong>
-                    </div>`).join('');
-
             const clientesPorId = indexarPorId(clientes);
+            const tecnicosPorId = indexarPorId(tecnicos);
+            const total = resumo.totalChamados;
+            const fechados = resumo.porStatus.FECHADO ?? 0;
+
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-andamento').textContent = total - fechados;
+            document.getElementById('kpi-resolucao').textContent = `${pct(fechados, total)}%`;
+            document.getElementById('kpi-fechados').textContent = `${fechados} de ${total} fechados`;
+
+            renderizarStatus(resumo.porStatus, total);
+            renderizarPrioridades(resumo.porPrioridade);
+            renderizarAtencao(
+                [...criticos.content, ...altos.content].filter(c => c.status !== 'FECHADO'),
+                clientesPorId);
+
             const lista = recentes.content;
             document.getElementById('recentes').innerHTML = lista.length
                 ? lista.map(c => `<tr>
                     <td>${linkChamado(c)}</td>
                     <td>${nomeDe(clientesPorId, c.clienteId)}</td>
+                    <td>${c.tecnicoId ? nomeDe(tecnicosPorId, c.tecnicoId) : '<span class="dash-sub">Não atribuído</span>'}</td>
                     <td>${badgePrioridade(c.prioridade)}</td>
                     <td>${badgeStatus(c.status)}</td>
-                    <td>${formatarData(c.dataAbertura)}</td>
+                    <td title="${formatarData(c.dataAbertura)}">${tempoDesde(c.dataAbertura)}</td>
                 </tr>`).join('')
-                : '<tr><td colspan="5" class="vazio">Nenhum chamado aberto ainda.</td></tr>';
+                : '<tr><td colspan="6" class="vazio">Nenhum chamado aberto ainda.</td></tr>';
         } catch (e) {
             erro(e);
         }
