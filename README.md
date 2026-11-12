@@ -3,9 +3,10 @@
 API REST para cadastro e acompanhamento de chamados.
 
 ## Como executar
-
+ Rode os seguintes comandos:
 ```powershell
-cmd /c mvnw.cmd spring-boot:run
+1-cmd /c mvnw.cmd spring-boot:run
+2- cmd /c mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=demo"
 ```
 
 A aplicação inicia em `http://localhost:8080`. O banco usado no desenvolvimento é H2 em memória.
